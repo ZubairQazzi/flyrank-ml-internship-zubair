@@ -1,0 +1,11 @@
+{
+  "held_out_rows": 4247,
+  "review_for_refresh": 276,
+  "check_ctr": 538,
+  "monitor": 1608,
+  "hold": 1825,
+  "random_state": 42,
+  "feature_window": "2026-03-01 to 2026-03-21",
+  "decision_moment": "2026-03-21",
+  "note": "Decision-support queue for human review. Actions are not automated recommendations."
+}
