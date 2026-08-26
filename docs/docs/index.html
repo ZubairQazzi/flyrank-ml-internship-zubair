@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Content Refresh Opportunity Scoring</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.65;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px;
+      color: #1f2937;
+      background: #ffffff;
+    }
+
+    h1, h2, h3 {
+      color: #111827;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      margin-bottom: 0.3rem;
+    }
+
+    h2 {
+      margin-top: 2.4rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .meta {
+      color: #6b7280;
+      margin-bottom: 2rem;
+    }
+
+    .summary {
+      background: #f9fafb;
+      border-left: 4px solid #4b5563;
+      padding: 1rem 1.2rem;
+      margin: 1.5rem 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+    }
+
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #f3f4f6;
+    }
+
+    img {
+      width: 100%;
+      max-width: 850px;
+      height: auto;
+      display: block;
+      margin: 1.5rem auto 0.5rem auto;
+    }
+
+    .caption {
+      color: #6b7280;
+      font-size: 0.95rem;
+      margin-bottom: 2rem;
+    }
+
+    code {
+      background: #f3f4f6;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    pre {
+      background: #111827;
+      color: #f9fafb;
+      padding: 1rem;
+      overflow-x: auto;
+      border-radius: 8px;
+    }
+
+    a {
+      color: #2563eb;
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      color: #4b5563;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Can Historical Search Signals Help Prioritize Content Refresh Review?</h1>
+
+  <div class="meta">
+    <strong>Author:</strong> Zubair Tariq<br />
+    <strong>Lane:</strong> Content Refresh Opportunity Scoring<br />
+    <strong>Date:</strong> August 2026
+  </div>
+
+  <h2>Abstract</h2>
+
+  <div class="summary">
+    <p>
+      This project asks whether historical search-performance signals can help
+      prioritize which published content pages deserve human review for possible
+      refresh work.
+    </p>
+
+    <p>
+      Using the FlyRank ML Internship dataset, I analyzed 85,967 eligible pages
+      and evaluated models on a grouped client holdout of 4,247 pages.
+    </p>
+
+    <p>
+      I compared a transparent staleness-and-visibility baseline with Logistic
+      Regression and Random Forest using five pre-decision search features.
+    </p>
+
+    <p>
+      Logistic Regression produced the strongest fresh result, reaching 55%
+      precision@20 compared with 20% for the rule baseline, while overall
+      ROC-AUC remained modest at 0.5537.
+    </p>
+
+    <p>
+      The final output is a human-review action queue designed to prioritize
+      editorial investigation rather than automate content changes.
+    </p>
+  </div>
+
+  <h2>Introduction / Problem statement</h2>
+
+  <p>
+    The project asks whether historical search-performance signals can help
+    prioritize which published content pages deserve human review for possible
+    refresh work.
+  </p>
+
+  <p>
+    The unit of analysis is a published content page. The system produces model
+    scores and a ranked queue that helps an editor decide which pages to inspect
+    first.
+  </p>
+
+  <p>
+    The intended action is not automatic rewriting or publishing. A human
+    reviewer decides whether a page should be reviewed for freshness, checked
+    for weak click capture, monitored, or held.
+  </p>
+
+  <p>
+    A wrong high-priority call can waste editorial effort or encourage
+    unnecessary changes. A wrong low-priority call can delay review of a page
+    that may deserve attention.
+  </p>
+
+  <p>
+    Machine learning helps by ranking a large content portfolio that would be
+    difficult to review manually, while keeping the final decision with a human.
+  </p>
+
+  <h2>Data</h2>
+
+  <p>
+    This project uses pseudonymized content-performance data from the FlyRank ML
+    Internship dataset, warehouse build <code>20260703</code>.
+  </p>
+
+  <p>The analysis uses:</p>
+
+  <ul>
+    <li><code>fact_content_daily_performance</code></li>
+    <li><code>dim_content</code></li>
+  </ul>
+
+  <p>
+    Historical search signals were measured from March 1–21, 2026. The later
+    March 22–31, 2026 window was used only to define the evaluation outcome.
+  </p>
+
+  <p>The five model features were:</p>
+
+  <ul>
+    <li><code>past_impressions</code></li>
+    <li><code>past_clicks</code></li>
+    <li><code>past_ctr</code></li>
+    <li><code>past_avg_position</code></li>
+    <li><code>gsc_observed_days</code></li>
+  </ul>
+
+  <p>
+    The final eligible population required at least 7 observed GSC days in the
+    feature window, at least 5 observed days in the outcome window, at least 100
+    historical impressions, and published non-deleted content.
+  </p>
+
+  <p>
+    Pseudonymous IDs were used only for grouping, joins, and evaluation.
+    Label-derived fields, future-window information, client names, page URLs,
+    private queries, and credentials were excluded from model features and
+    public outputs.
+  </p>
+
+  <h2>Methodology</h2>
+
+  <p>
+    The task is treated as a ranking problem around a binary
+    <code>future_decline</code> proxy.
+  </p>
+
+  <p>
+    A page is labeled positive when its average daily impressions during
+    March 22–31, 2026 are less than 80% of its average daily impressions during
+    March 1–21, 2026.
+  </p>
+
+  <p>Three approaches were compared:</p>
+
+  <ol>
+    <li>Transparent staleness + visibility rule baseline</li>
+    <li>Logistic Regression</li>
+    <li>Random Forest</li>
+  </ol>
+
+  <p>
+    Validation used a grouped holdout by <code>client_hash_id</code> with a
+    fixed random seed of <code>42</code>. This prevents pages from the same
+    client appearing in both training and test data.
+  </p>
+
+  <p>
+    Logistic Regression produced the strongest fresh benchmark result, while
+    Random Forest was retained as the scoring model used by the Week 7 action
+    playbook.
+  </p>
+
+  <h2>Results</h2>
+
+  <p>
+    The deterministic split contained 81,720 training rows and 4,247 held-out
+    test rows. The test set contained 8 clients, with zero client overlap, and a
+    positive base rate of 41.96%.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>Precision@10</th>
+        <th>Precision@20</th>
+        <th>ROC-AUC</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Rule baseline</td>
+        <td>10%</td>
+        <td>20%</td>
+        <td>0.4760</td>
+      </tr>
+      <tr>
+        <td>Logistic Regression</td>
+        <td>40%</td>
+        <td>55%</td>
+        <td>0.5537</td>
+      </tr>
+      <tr>
+        <td>Random Forest</td>
+        <td>40%</td>
+        <td>50%</td>
+        <td>0.5529</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <img
+    src="../work/figures/capstone_model_vs_baseline.png"
+    alt="Held-out ranking performance comparison"
+  />
+
+  <p class="caption">
+    Takeaway: both learned models improved top-of-queue precision over the rule
+    baseline, but overall discrimination remained modest.
+  </p>
+
+  <p>
+    Logistic Regression produced the strongest fresh result. It matched Random
+    Forest at precision@10, exceeded it at precision@20, and had a slightly
+    higher ROC-AUC.
+  </p>
+
+  <p>
+    The results support using the learned ranking as a decision-support signal,
+    but do not justify automatic content decisions.
+  </p>
+
+  <h2>Limitations & honest framing</h2>
+
+  <p>
+    This analysis is observational and predictive. It does not show that
+    refreshing a page causes an improvement in search performance.
+  </p>
+
+  <p>
+    The <code>future_decline</code> target is a practical proxy and does not
+    represent every form of content deterioration.
+  </p>
+
+  <p>
+    The held-out test population contains only eight clients, so performance may
+    differ for substantially different client or content distributions.
+  </p>
+
+  <p>
+    The evaluation also applies only to pages with sufficient observed GSC
+    coverage and at least 100 historical impressions.
+  </p>
+
+  <p>
+    Overall ROC-AUC remained close to 0.55. The model should therefore be used
+    as a prioritization aid rather than an automatic decision system.
+  </p>
+
+  <h2>Ranked recommendations</h2>
+
+  <p>The final held-out queue contains 4,247 pages:</p>
+
+  <ul>
+    <li>276 <code>REVIEW_FOR_REFRESH</code></li>
+    <li>538 <code>CHECK_CTR</code></li>
+    <li>1,608 <code>MONITOR</code></li>
+    <li>1,825 <code>HOLD</code></li>
+  </ul>
+
+  <img
+    src="../work/figures/capstone_action_distribution.png"
+    alt="Distribution of final human-review actions"
+  />
+
+  <p class="caption">
+    Takeaway: most pages are monitored or held, reflecting a deliberately
+    conservative review policy.
+  </p>
+
+  <p>The recommended workflow is:</p>
+
+  <ol>
+    <li>
+      Review <code>REVIEW_FOR_REFRESH</code> pages first because they combine
+      higher measured risk with enough existing visibility to justify editorial
+      attention.
+    </li>
+    <li>
+      For <code>CHECK_CTR</code>, inspect title, snippet, SERP context, and
+      search-intent alignment before considering broader changes.
+    </li>
+    <li>
+      For <code>MONITOR</code>, wait for another measurement window unless
+      other evidence suggests urgent review.
+    </li>
+    <li>
+      For <code>HOLD</code>, take no immediate action unless new evidence
+      appears.
+    </li>
+  </ol>
+
+  <p>
+    The system should not automatically rewrite or publish content, delete
+    pages, change redirects or canonicals, modify metadata, or make spending
+    decisions from model scores alone.
+  </p>
+
+  <h2>Reproducibility</h2>
+
+  <p>
+    The complete project is available in the public GitHub repository:
+  </p>
+
+  <p>
+    <a
+      href="https://github.com/ZubairQazzi/flyrank-ml-internship-zubair"
+      target="_blank"
+    >
+      github.com/ZubairQazzi/flyrank-ml-internship-zubair
+    </a>
+  </p>
+
+  <p>
+    The final analysis notebook is:
+    <code>work/notebooks/capstone.ipynb</code>
+  </p>
+
+  <p>Key reproducibility settings:</p>
+
+  <ul>
+    <li>Random seed: <code>42</code></li>
+    <li>Feature window: March 1–21, 2026</li>
+    <li>Outcome window: March 22–31, 2026</li>
+    <li>Grouped test size: 20% of clients</li>
+    <li>Held-out rows: 4,247</li>
+    <li>Client overlap: 0</li>
+  </ul>
+
+  <p>The notebook regenerates:</p>
+
+  <ul>
+    <li><code>work/figures/capstone_model_vs_baseline.png</code></li>
+    <li><code>work/figures/capstone_action_distribution.png</code></li>
+    <li><code>work/outputs/capstone_metrics.json</code></li>
+  </ul>
+
+  <h2>Acknowledgments & data credit</h2>
+
+  <p>
+    This project was completed as part of the FlyRank ML Internship.
+  </p>
+
+  <p>
+    Built on the
+    <a href="https://flyrank.ai" target="_blank">
+      FlyRank ML Internship dataset
+    </a>.
+  </p>
+
+  <p>
+    The dataset provided the pseudonymized production search-performance data
+    used throughout this analysis. All interpretations, modeling choices,
+    validation decisions, and recommendations in this report are my own.
+  </p>
+
+  <footer>
+    Content Refresh Opportunity Scoring · Zubair Tariq · August 2026
+  </footer>
+
+</body>
+</html>
