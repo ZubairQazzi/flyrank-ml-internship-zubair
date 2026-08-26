@@ -3,445 +3,1229 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Content Refresh Opportunity Scoring</title>
+
+  <title>Can Historical Search Signals Help Prioritize Content Refresh Review?</title>
+
+  <meta
+    name="description"
+    content="A reproducible ML study of content refresh opportunity scoring using pseudonymized FlyRank production search-performance data."
+  />
+
   <style>
+    :root {
+      --bg: #f7f9fc;
+      --surface: #ffffff;
+      --surface-soft: #f3f6fb;
+      --text: #172033;
+      --muted: #667085;
+      --border: #e4e9f2;
+      --accent: #3157d5;
+      --accent-soft: #eef2ff;
+      --dark: #111827;
+      --success: #147d64;
+      --warning: #9a6700;
+      --shadow: 0 14px 40px rgba(27, 39, 71, 0.08);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      line-height: 1.65;
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 32px 20px;
-      color: #1f2937;
-      background: #ffffff;
-    }
-
-    h1, h2, h3 {
-      color: #111827;
-    }
-
-    h1 {
-      font-size: 2.4rem;
-      margin-bottom: 0.3rem;
-    }
-
-    h2 {
-      margin-top: 2.4rem;
-      padding-bottom: 0.4rem;
-      border-bottom: 1px solid #e5e7eb;
-    }
-
-    .meta {
-      color: #6b7280;
-      margin-bottom: 2rem;
-    }
-
-    .summary {
-      background: #f9fafb;
-      border-left: 4px solid #4b5563;
-      padding: 1rem 1.2rem;
-      margin: 1.5rem 0;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 1rem 0;
-    }
-
-    th, td {
-      border: 1px solid #d1d5db;
-      padding: 10px;
-      text-align: left;
-    }
-
-    th {
-      background: #f3f4f6;
-    }
-
-    img {
-      width: 100%;
-      max-width: 850px;
-      height: auto;
-      display: block;
-      margin: 1.5rem auto 0.5rem auto;
-    }
-
-    .caption {
-      color: #6b7280;
-      font-size: 0.95rem;
-      margin-bottom: 2rem;
-    }
-
-    code {
-      background: #f3f4f6;
-      padding: 2px 5px;
-      border-radius: 4px;
-    }
-
-    pre {
-      background: #111827;
-      color: #f9fafb;
-      padding: 1rem;
-      overflow-x: auto;
-      border-radius: 8px;
+      margin: 0;
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.72;
+      -webkit-font-smoothing: antialiased;
     }
 
     a {
-      color: #2563eb;
+      color: var(--accent);
+      text-decoration: none;
     }
 
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    /* ---------------------------
+       Navigation
+    --------------------------- */
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(14px);
+      background: rgba(247, 249, 252, 0.9);
+      border-bottom: 1px solid rgba(228, 233, 242, 0.9);
+    }
+
+    .nav {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      font-weight: 800;
+      color: var(--dark);
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .nav-links a {
+      color: #4b5565;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* ---------------------------
+       Hero
+    --------------------------- */
+
+    .hero {
+      padding: 78px 0 48px;
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 58px;
+    }
+
+    .hero-card::before {
+      content: "";
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      right: -140px;
+      top: -160px;
+    }
+
+    .eyebrow {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      position: relative;
+      margin: 20px 0 18px;
+      max-width: 900px;
+      font-size: clamp(2.35rem, 5vw, 4.4rem);
+      line-height: 1.08;
+      letter-spacing: -0.045em;
+      color: var(--dark);
+    }
+
+    .hero-subtitle {
+      position: relative;
+      max-width: 790px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.17rem;
+      line-height: 1.75;
+    }
+
+    .hero-meta {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin-top: 30px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .hero-meta strong {
+      color: var(--dark);
+    }
+
+    /* ---------------------------
+       Metric cards
+    --------------------------- */
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 23px 22px;
+      box-shadow: 0 8px 28px rgba(27, 39, 71, 0.045);
+    }
+
+    .metric-value {
+      color: var(--dark);
+      font-size: 1.9rem;
+      line-height: 1.2;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+    }
+
+    .metric-label {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    /* ---------------------------
+       General sections
+    --------------------------- */
+
+    main {
+      padding-bottom: 70px;
+    }
+
+    section {
+      scroll-margin-top: 88px;
+      padding: 38px 0;
+    }
+
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 38px;
+      box-shadow: 0 8px 28px rgba(27, 39, 71, 0.035);
+    }
+
+    .section-kicker {
+      color: var(--accent);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    h2 {
+      margin: 0 0 22px;
+      color: var(--dark);
+      font-size: clamp(1.6rem, 3vw, 2.25rem);
+      line-height: 1.2;
+      letter-spacing: -0.035em;
+    }
+
+    h3 {
+      color: var(--dark);
+      margin: 28px 0 12px;
+      font-size: 1.15rem;
+    }
+
+    p {
+      margin: 0 0 18px;
+    }
+
+    ul,
+    ol {
+      padding-left: 23px;
+    }
+
+    li {
+      margin-bottom: 9px;
+    }
+
+    code {
+      padding: 3px 6px;
+      border-radius: 6px;
+      background: var(--surface-soft);
+      color: #344054;
+      font-size: 0.91em;
+    }
+
+    /* ---------------------------
+       Abstract
+    --------------------------- */
+
+    .abstract {
+      border-left: 4px solid var(--accent);
+      background: var(--surface-soft);
+      padding: 24px 27px;
+      border-radius: 0 14px 14px 0;
+    }
+
+    .abstract p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ---------------------------
+       Callouts
+    --------------------------- */
+
+    .callout {
+      margin: 25px 0;
+      padding: 20px 22px;
+      border: 1px solid #dfe5f7;
+      border-radius: 14px;
+      background: var(--accent-soft);
+    }
+
+    .callout-title {
+      margin-bottom: 7px;
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .callout p:last-child {
+      margin-bottom: 0;
+    }
+
+    .honest {
+      border-color: #cce7df;
+      background: #f1faf7;
+    }
+
+    .honest .callout-title {
+      color: var(--success);
+    }
+
+    /* ---------------------------
+       Data / feature grids
+    --------------------------- */
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-top: 22px;
+    }
+
+    .mini-card {
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .mini-card strong {
+      color: var(--dark);
+    }
+
+    /* ---------------------------
+       Results table
+    --------------------------- */
+
+    .table-wrap {
+      margin: 24px 0;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 650px;
+      border-collapse: collapse;
+      background: var(--surface);
+    }
+
+    th,
+    td {
+      padding: 15px 17px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      color: #475467;
+      background: var(--surface-soft);
+      font-size: 0.82rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .best-row {
+      background: #f5f7ff;
+    }
+
+    .best {
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    /* ---------------------------
+       Figures
+    --------------------------- */
+
+    .figure-card {
+      margin: 28px 0;
+      padding: 17px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 35px rgba(27, 39, 71, 0.05);
+    }
+
+    .figure-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+    }
+
+    .caption {
+      margin: 12px 5px 3px;
+      color: var(--muted);
+      font-size: 0.91rem;
+    }
+
+    .caption strong {
+      color: var(--text);
+    }
+
+    /* ---------------------------
+       Recommendation cards
+    --------------------------- */
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin: 25px 0;
+    }
+
+    .action-card {
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 21px;
+      background: var(--surface-soft);
+    }
+
+    .action-count {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--dark);
+    }
+
+    .action-name {
+      margin-top: 3px;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+
+    .action-description {
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    /* ---------------------------
+       Repro box
+    --------------------------- */
+
+    .repro-box {
+      background: #101828;
+      color: #e6ebf4;
+      border-radius: 14px;
+      padding: 22px;
+      overflow-x: auto;
+      margin: 22px 0;
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+
+    /* ---------------------------
+       Footer
+    --------------------------- */
+
     footer {
-      margin-top: 3rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid #e5e7eb;
-      color: #4b5563;
+      padding: 40px 0 55px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.88rem;
+    }
+
+    .footer-title {
+      color: var(--dark);
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    /* ---------------------------
+       Responsive
+    --------------------------- */
+
+    @media (max-width: 850px) {
+      .metrics {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .action-grid,
+      .mini-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-card {
+        padding: 38px 28px;
+      }
+
+      .nav {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 14px 0;
+      }
+
+      .nav-links {
+        justify-content: flex-start;
+        gap: 14px;
+      }
+    }
+
+    @media (max-width: 540px) {
+      .container {
+        width: min(100% - 24px, 1120px);
+      }
+
+      .hero {
+        padding-top: 38px;
+      }
+
+      .hero-card {
+        padding: 30px 22px;
+        border-radius: 20px;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .section-card {
+        padding: 27px 21px;
+      }
+
+      .nav-links {
+        font-size: 0.82rem;
+      }
     }
   </style>
 </head>
 
 <body>
 
-  <h1>Can Historical Search Signals Help Prioritize Content Refresh Review?</h1>
+  <!-- Navigation -->
+  <header class="topbar">
+    <div class="container nav">
+      <div class="brand">Content Refresh Research</div>
 
-  <div class="meta">
-    <strong>Author:</strong> Zubair Tariq<br />
-    <strong>Lane:</strong> Content Refresh Opportunity Scoring<br />
-    <strong>Date:</strong> August 2026
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#abstract">Abstract</a>
+        <a href="#methodology">Method</a>
+        <a href="#results">Results</a>
+        <a href="#limitations">Limitations</a>
+        <a href="#recommendations">Recommendations</a>
+        <a href="#reproducibility">Reproducibility</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <div class="container hero">
+    <div class="hero-card">
+
+      <div class="eyebrow">
+        ML Research · Decision Support
+      </div>
+
+      <h1>
+        Can Historical Search Signals Help Prioritize Content Refresh Review?
+      </h1>
+
+      <p class="hero-subtitle">
+        A reproducible study of whether historical search-performance signals
+        can improve how editors prioritize published pages for human review,
+        using pseudonymized production search data.
+      </p>
+
+      <div class="hero-meta">
+        <span><strong>Author:</strong> Zubair Tariq</span>
+        <span><strong>Lane:</strong> Content Refresh Opportunity Scoring</span>
+        <span><strong>Date:</strong> August 2026</span>
+      </div>
+
+    </div>
+
+    <!-- Headline metrics -->
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="metric-value">85,967</div>
+        <div class="metric-label">Eligible content pages</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-value">4,247</div>
+        <div class="metric-label">Held-out evaluation pages</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-value">55%</div>
+        <div class="metric-label">Best Precision@20</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-value">0</div>
+        <div class="metric-label">Client overlap in validation</div>
+      </div>
+    </div>
   </div>
 
-  <h2>Abstract</h2>
+  <main class="container">
 
-  <div class="summary">
-    <p>
-      This project asks whether historical search-performance signals can help
-      prioritize which published content pages deserve human review for possible
-      refresh work.
-    </p>
+    <!-- Abstract -->
+    <section id="abstract">
+      <div class="section-card">
+        <div class="section-kicker">Research summary</div>
+        <h2>Abstract</h2>
 
-    <p>
-      Using the FlyRank ML Internship dataset, I analyzed 85,967 eligible pages
-      and evaluated models on a grouped client holdout of 4,247 pages.
-    </p>
+        <div class="abstract">
+          <p>
+            This project asks whether historical search-performance signals can
+            help prioritize which published content pages deserve human review
+            for possible refresh work.
+          </p>
 
-    <p>
-      I compared a transparent staleness-and-visibility baseline with Logistic
-      Regression and Random Forest using five pre-decision search features.
-    </p>
+          <p>
+            Using the FlyRank ML Internship dataset, I analyzed 85,967 eligible
+            pages and evaluated models on a grouped client holdout of 4,247
+            pages.
+          </p>
 
-    <p>
-      Logistic Regression produced the strongest fresh result, reaching 55%
-      precision@20 compared with 20% for the rule baseline, while overall
-      ROC-AUC remained modest at 0.5537.
-    </p>
+          <p>
+            I compared a transparent staleness-and-visibility baseline with
+            Logistic Regression and Random Forest using five pre-decision search
+            features.
+          </p>
 
-    <p>
-      The final output is a human-review action queue designed to prioritize
-      editorial investigation rather than automate content changes.
-    </p>
-  </div>
+          <p>
+            Logistic Regression produced the strongest fresh result, reaching
+            55% precision@20 compared with 20% for the rule baseline, while
+            overall ROC-AUC remained modest at 0.5537.
+          </p>
 
-  <h2>Introduction / Problem statement</h2>
+          <p>
+            The final output is a human-review action queue designed to
+            prioritize editorial investigation rather than automate content
+            changes.
+          </p>
+        </div>
+      </div>
+    </section>
 
-  <p>
-    The project asks whether historical search-performance signals can help
-    prioritize which published content pages deserve human review for possible
-    refresh work.
-  </p>
+    <!-- Problem -->
+    <section id="problem">
+      <div class="section-card">
+        <div class="section-kicker">01 · Problem</div>
+        <h2>Introduction / Problem statement</h2>
 
-  <p>
-    The unit of analysis is a published content page. The system produces model
-    scores and a ranked queue that helps an editor decide which pages to inspect
-    first.
-  </p>
+        <p>
+          The project asks whether historical search-performance signals can
+          help prioritize which published content pages deserve human review for
+          possible refresh work.
+        </p>
 
-  <p>
-    The intended action is not automatic rewriting or publishing. A human
-    reviewer decides whether a page should be reviewed for freshness, checked
-    for weak click capture, monitored, or held.
-  </p>
+        <p>
+          The unit of analysis is a published content page. The analysis
+          produces model scores and a ranked queue that helps an editor decide
+          which pages to inspect first.
+        </p>
 
-  <p>
-    A wrong high-priority call can waste editorial effort or encourage
-    unnecessary changes. A wrong low-priority call can delay review of a page
-    that may deserve attention.
-  </p>
+        <div class="callout">
+          <div class="callout-title">The decision</div>
+          <p>
+            The system does not decide what should be rewritten. It helps a
+            human reviewer decide where limited editorial attention should go
+            first.
+          </p>
+        </div>
 
-  <p>
-    Machine learning helps by ranking a large content portfolio that would be
-    difficult to review manually, while keeping the final decision with a human.
-  </p>
+        <p>
+          A wrong high-priority call can waste editorial effort or encourage an
+          unnecessary change. A wrong low-priority call can delay review of a
+          page that may deserve attention.
+        </p>
 
-  <h2>Data</h2>
+        <p>
+          Machine learning is useful here because the portfolio contains far
+          more content-performance observations than a person can review
+          manually.
+        </p>
+      </div>
+    </section>
 
-  <p>
-    This project uses pseudonymized content-performance data from the FlyRank ML
-    Internship dataset, warehouse build <code>20260703</code>.
-  </p>
+    <!-- Data -->
+    <section id="data">
+      <div class="section-card">
+        <div class="section-kicker">02 · Data</div>
+        <h2>Data</h2>
 
-  <p>The analysis uses:</p>
+        <p>
+          This project uses pseudonymized content-performance data from the
+          FlyRank ML Internship dataset, warehouse build
+          <code>20260703</code>.
+        </p>
 
-  <ul>
-    <li><code>fact_content_daily_performance</code></li>
-    <li><code>dim_content</code></li>
-  </ul>
+        <div class="mini-grid">
+          <div class="mini-card">
+            <strong>Feature window</strong>
+            <p>March 1–21, 2026</p>
+          </div>
 
-  <p>
-    Historical search signals were measured from March 1–21, 2026. The later
-    March 22–31, 2026 window was used only to define the evaluation outcome.
-  </p>
+          <div class="mini-card">
+            <strong>Outcome window</strong>
+            <p>March 22–31, 2026</p>
+          </div>
+        </div>
 
-  <p>The five model features were:</p>
+        <h3>Source tables</h3>
 
-  <ul>
-    <li><code>past_impressions</code></li>
-    <li><code>past_clicks</code></li>
-    <li><code>past_ctr</code></li>
-    <li><code>past_avg_position</code></li>
-    <li><code>gsc_observed_days</code></li>
-  </ul>
+        <ul>
+          <li><code>fact_content_daily_performance</code></li>
+          <li><code>dim_content</code></li>
+        </ul>
 
-  <p>
-    The final eligible population required at least 7 observed GSC days in the
-    feature window, at least 5 observed days in the outcome window, at least 100
-    historical impressions, and published non-deleted content.
-  </p>
+        <h3>Five pre-decision features</h3>
 
-  <p>
-    Pseudonymous IDs were used only for grouping, joins, and evaluation.
-    Label-derived fields, future-window information, client names, page URLs,
-    private queries, and credentials were excluded from model features and
-    public outputs.
-  </p>
+        <ul>
+          <li><code>past_impressions</code></li>
+          <li><code>past_clicks</code></li>
+          <li><code>past_ctr</code></li>
+          <li><code>past_avg_position</code></li>
+          <li><code>gsc_observed_days</code></li>
+        </ul>
 
-  <h2>Methodology</h2>
+        <h3>Eligibility</h3>
 
-  <p>
-    The task is treated as a ranking problem around a binary
-    <code>future_decline</code> proxy.
-  </p>
+        <ul>
+          <li>Published and non-deleted content</li>
+          <li>At least 7 observed GSC days in the feature window</li>
+          <li>At least 5 observed GSC days in the outcome window</li>
+          <li>At least 100 historical impressions</li>
+        </ul>
 
-  <p>
-    A page is labeled positive when its average daily impressions during
-    March 22–31, 2026 are less than 80% of its average daily impressions during
-    March 1–21, 2026.
-  </p>
+        <div class="callout honest">
+          <div class="callout-title">Public-safety boundary</div>
+          <p>
+            Pseudonymous IDs are used only for grouping, joins, and evaluation.
+            Client names, page URLs, private queries, credentials,
+            future-window information, and label-derived trend fields are not
+            used as model features or exposed in the public paper.
+          </p>
+        </div>
+      </div>
+    </section>
 
-  <p>Three approaches were compared:</p>
+    <!-- Methodology -->
+    <section id="methodology">
+      <div class="section-card">
+        <div class="section-kicker">03 · Method</div>
+        <h2>Methodology</h2>
 
-  <ol>
-    <li>Transparent staleness + visibility rule baseline</li>
-    <li>Logistic Regression</li>
-    <li>Random Forest</li>
-  </ol>
+        <p>
+          The task is treated as a ranking problem around a binary
+          <code>future_decline</code> proxy.
+        </p>
 
-  <p>
-    Validation used a grouped holdout by <code>client_hash_id</code> with a
-    fixed random seed of <code>42</code>. This prevents pages from the same
-    client appearing in both training and test data.
-  </p>
+        <p>
+          A page is labeled positive when its average daily impressions during
+          March 22–31, 2026 are less than 80% of its average daily impressions
+          during March 1–21, 2026.
+        </p>
 
-  <p>
-    Logistic Regression produced the strongest fresh benchmark result, while
-    Random Forest was retained as the scoring model used by the Week 7 action
-    playbook.
-  </p>
+        <h3>Compared approaches</h3>
 
-  <h2>Results</h2>
+        <ol>
+          <li>
+            <strong>Transparent rule baseline</strong> —
+            staleness + visibility
+          </li>
+          <li>
+            <strong>Logistic Regression</strong> —
+            simple learned reference
+          </li>
+          <li>
+            <strong>Random Forest</strong> —
+            non-linear comparison and Week 7 playbook scorer
+          </li>
+        </ol>
 
-  <p>
-    The deterministic split contained 81,720 training rows and 4,247 held-out
-    test rows. The test set contained 8 clients, with zero client overlap, and a
-    positive base rate of 41.96%.
-  </p>
+        <h3>Validation design</h3>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Method</th>
-        <th>Precision@10</th>
-        <th>Precision@20</th>
-        <th>ROC-AUC</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Rule baseline</td>
-        <td>10%</td>
-        <td>20%</td>
-        <td>0.4760</td>
-      </tr>
-      <tr>
-        <td>Logistic Regression</td>
-        <td>40%</td>
-        <td>55%</td>
-        <td>0.5537</td>
-      </tr>
-      <tr>
-        <td>Random Forest</td>
-        <td>40%</td>
-        <td>50%</td>
-        <td>0.5529</td>
-      </tr>
-    </tbody>
-  </table>
+        <p>
+          Validation uses a grouped holdout by
+          <code>client_hash_id</code> with
+          <code>random_state=42</code>.
+          Pages belonging to the same client therefore cannot appear in both
+          training and test data.
+        </p>
 
-  <img
-    src="../work/figures/capstone_model_vs_baseline.png"
-    alt="Held-out ranking performance comparison"
-  />
+        <div class="mini-grid">
+          <div class="mini-card">
+            <strong>Training clients</strong>
+            <p>31</p>
+          </div>
 
-  <p class="caption">
-    Takeaway: both learned models improved top-of-queue precision over the rule
-    baseline, but overall discrimination remained modest.
-  </p>
+          <div class="mini-card">
+            <strong>Held-out clients</strong>
+            <p>8</p>
+          </div>
 
-  <p>
-    Logistic Regression produced the strongest fresh result. It matched Random
-    Forest at precision@10, exceeded it at precision@20, and had a slightly
-    higher ROC-AUC.
-  </p>
+          <div class="mini-card">
+            <strong>Training rows</strong>
+            <p>81,720</p>
+          </div>
 
-  <p>
-    The results support using the learned ranking as a decision-support signal,
-    but do not justify automatic content decisions.
-  </p>
+          <div class="mini-card">
+            <strong>Held-out rows</strong>
+            <p>4,247</p>
+          </div>
+        </div>
 
-  <h2>Limitations & honest framing</h2>
+        <div class="callout honest">
+          <div class="callout-title">Leakage check</div>
+          <p>
+            The feature and outcome windows are separated, future-window values
+            and label-derived fields are excluded, and pseudonymous IDs are
+            used only for grouping rather than prediction.
+          </p>
+        </div>
+      </div>
+    </section>
 
-  <p>
-    This analysis is observational and predictive. It does not show that
-    refreshing a page causes an improvement in search performance.
-  </p>
+    <!-- Results -->
+    <section id="results">
+      <div class="section-card">
+        <div class="section-kicker">04 · Results</div>
+        <h2>Results vs baseline</h2>
 
-  <p>
-    The <code>future_decline</code> target is a practical proxy and does not
-    represent every form of content deterioration.
-  </p>
+        <p>
+          The held-out positive base rate is <strong>41.96%</strong>.
+          Precision@K is therefore interpreted relative to that context rather
+          than as a standalone number.
+        </p>
 
-  <p>
-    The held-out test population contains only eight clients, so performance may
-    differ for substantially different client or content distributions.
-  </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Precision@10</th>
+                <th>Precision@20</th>
+                <th>ROC-AUC</th>
+              </tr>
+            </thead>
 
-  <p>
-    The evaluation also applies only to pages with sufficient observed GSC
-    coverage and at least 100 historical impressions.
-  </p>
+            <tbody>
+              <tr>
+                <td>Rule baseline</td>
+                <td>10%</td>
+                <td>20%</td>
+                <td>0.4760</td>
+              </tr>
 
-  <p>
-    Overall ROC-AUC remained close to 0.55. The model should therefore be used
-    as a prioritization aid rather than an automatic decision system.
-  </p>
+              <tr class="best-row">
+                <td><strong>Logistic Regression</strong></td>
+                <td class="best">40%</td>
+                <td class="best">55%</td>
+                <td class="best">0.5537</td>
+              </tr>
 
-  <h2>Ranked recommendations</h2>
+              <tr>
+                <td>Random Forest</td>
+                <td>40%</td>
+                <td>50%</td>
+                <td>0.5529</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-  <p>The final held-out queue contains 4,247 pages:</p>
+        <div class="figure-card">
+          <img
+            src="assets/capstone_model_vs_baseline.png"
+            alt="Held-out ranking performance comparison between baseline, Logistic Regression, and Random Forest"
+          />
 
-  <ul>
-    <li>276 <code>REVIEW_FOR_REFRESH</code></li>
-    <li>538 <code>CHECK_CTR</code></li>
-    <li>1,608 <code>MONITOR</code></li>
-    <li>1,825 <code>HOLD</code></li>
-  </ul>
+          <p class="caption">
+            <strong>Takeaway:</strong>
+            both learned models improved top-of-queue precision over the
+            transparent rule baseline, but overall discrimination remained
+            modest.
+          </p>
+        </div>
 
-  <img
-    src="../work/figures/capstone_action_distribution.png"
-    alt="Distribution of final human-review actions"
-  />
+        <div class="callout">
+          <div class="callout-title">Headline result</div>
+          <p>
+            Logistic Regression produced the strongest fresh result:
+            <strong>55% precision@20</strong> versus
+            <strong>20%</strong> for the transparent rule baseline.
+          </p>
+        </div>
 
-  <p class="caption">
-    Takeaway: most pages are monitored or held, reflecting a deliberately
-    conservative review policy.
-  </p>
+        <p>
+          Logistic Regression matched Random Forest at precision@10, exceeded
+          it at precision@20, and had a slightly higher ROC-AUC.
+        </p>
 
-  <p>The recommended workflow is:</p>
+        <p>
+          The learned models therefore provide useful ranking signal at the top
+          of the queue, but their ROC-AUC values around 0.55 show that the five
+          historical features do not fully explain future decline.
+        </p>
+      </div>
+    </section>
 
-  <ol>
-    <li>
-      Review <code>REVIEW_FOR_REFRESH</code> pages first because they combine
-      higher measured risk with enough existing visibility to justify editorial
-      attention.
-    </li>
-    <li>
-      For <code>CHECK_CTR</code>, inspect title, snippet, SERP context, and
-      search-intent alignment before considering broader changes.
-    </li>
-    <li>
-      For <code>MONITOR</code>, wait for another measurement window unless
-      other evidence suggests urgent review.
-    </li>
-    <li>
-      For <code>HOLD</code>, take no immediate action unless new evidence
-      appears.
-    </li>
-  </ol>
+    <!-- Interpretation -->
+    <section id="interpretation">
+      <div class="section-card">
+        <div class="section-kicker">05 · Interpretation</div>
+        <h2>What the models actually found</h2>
 
-  <p>
-    The system should not automatically rewrite or publish content, delete
-    pages, change redirects or canonicals, modify metadata, or make spending
-    decisions from model scores alone.
-  </p>
+        <p>
+          Earlier permutation-importance analysis suggested that
+          <code>gsc_observed_days</code>,
+          <code>past_clicks</code>, and
+          <code>past_ctr</code>
+          carried more useful signal than the other features.
+        </p>
 
-  <h2>Reproducibility</h2>
+        <p>
+          <code>past_impressions</code> contributed less, while
+          <code>past_avg_position</code> did not clearly improve
+          generalization on held-out clients.
+        </p>
 
-  <p>
-    The complete project is available in the public GitHub repository:
-  </p>
+        <h3>Two recurring error patterns</h3>
 
-  <p>
-    <a
-      href="https://github.com/ZubairQazzi/flyrank-ml-internship-zubair"
-      target="_blank"
-    >
-      github.com/ZubairQazzi/flyrank-ml-internship-zubair
-    </a>
-  </p>
+        <p>
+          First, pages with weak historical engagement can receive high
+          decline-risk scores even when later performance remains stable.
+          Weak CTR or clicks should therefore not automatically trigger a
+          refresh.
+        </p>
 
-  <p>
-    The final analysis notebook is:
-    <code>work/notebooks/capstone.ipynb</code>
-  </p>
+        <p>
+          Second, some pages with healthy-looking historical impressions and
+          clicks still decline later. Static historical totals cannot capture
+          every temporal, seasonal, or content-specific factor.
+        </p>
 
-  <p>Key reproducibility settings:</p>
+        <div class="callout honest">
+          <div class="callout-title">Interpretation</div>
+          <p>
+            The finding is directional rather than definitive: historical
+            search signals can improve prioritization over a simple baseline,
+            but they are not strong enough to support automatic content
+            decisions.
+          </p>
+        </div>
+      </div>
+    </section>
 
-  <ul>
-    <li>Random seed: <code>42</code></li>
-    <li>Feature window: March 1–21, 2026</li>
-    <li>Outcome window: March 22–31, 2026</li>
-    <li>Grouped test size: 20% of clients</li>
-    <li>Held-out rows: 4,247</li>
-    <li>Client overlap: 0</li>
-  </ul>
+    <!-- Limitations -->
+    <section id="limitations">
+      <div class="section-card">
+        <div class="section-kicker">06 · Limits</div>
+        <h2>Limitations & honest framing</h2>
 
-  <p>The notebook regenerates:</p>
+        <p>
+          This analysis is observational and predictive. It does not show that
+          refreshing a page causes an improvement in search performance.
+        </p>
 
-  <ul>
-    <li><code>work/figures/capstone_model_vs_baseline.png</code></li>
-    <li><code>work/figures/capstone_action_distribution.png</code></li>
-    <li><code>work/outputs/capstone_metrics.json</code></li>
-  </ul>
+        <ul>
+          <li>
+            <code>future_decline</code> is an operational proxy, not a complete
+            definition of content deterioration.
+          </li>
 
-  <h2>Acknowledgments & data credit</h2>
+          <li>
+            The held-out evaluation contains only eight clients, so results may
+            differ for substantially different client or content distributions.
+          </li>
 
-  <p>
-    This project was completed as part of the FlyRank ML Internship.
-  </p>
+          <li>
+            The population excludes pages without sufficient observed GSC
+            coverage or at least 100 historical impressions.
+          </li>
 
-  <p>
-    Built on the
-    <a href="https://flyrank.ai" target="_blank">
-      FlyRank ML Internship dataset
-    </a>.
-  </p>
+          <li>
+            Historical impressions, clicks, CTR, position, and observed-day
+            coverage do not capture every factor affecting search performance.
+          </li>
 
-  <p>
-    The dataset provided the pseudonymized production search-performance data
-    used throughout this analysis. All interpretations, modeling choices,
-    validation decisions, and recommendations in this report are my own.
-  </p>
+          <li>
+            Overall ROC-AUC remains close to 0.55, indicating modest
+            discrimination.
+          </li>
+        </ul>
+
+        <div class="callout honest">
+          <div class="callout-title">What this paper does not claim</div>
+          <p>
+            A high model score does not prove that a page needs a refresh and
+            does not imply that a refresh will improve future performance.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recommendations -->
+    <section id="recommendations">
+      <div class="section-card">
+        <div class="section-kicker">07 · Action playbook</div>
+        <h2>Ranked recommendations</h2>
+
+        <p>
+          The final held-out queue contains
+          <strong>4,247 pages</strong>.
+          The output is deliberately conservative and requires human review.
+        </p>
+
+        <div class="action-grid">
+
+          <div class="action-card">
+            <div class="action-count">276</div>
+            <div class="action-name">REVIEW_FOR_REFRESH</div>
+            <div class="action-description">
+              Higher measured risk with enough existing visibility to justify
+              editorial investigation.
+            </div>
+          </div>
+
+          <div class="action-card">
+            <div class="action-count">538</div>
+            <div class="action-name">CHECK_CTR</div>
+            <div class="action-description">
+              Inspect title, snippet, SERP context, and search-intent alignment
+              before considering broader changes.
+            </div>
+          </div>
+
+          <div class="action-card">
+            <div class="action-count">1,608</div>
+            <div class="action-name">MONITOR</div>
+            <div class="action-description">
+              Some measured risk exists, but evidence is not strong enough for
+              an immediate content change.
+            </div>
+          </div>
+
+          <div class="action-card">
+            <div class="action-count">1,825</div>
+            <div class="action-name">HOLD</div>
+            <div class="action-description">
+              Current evidence is too weak to prioritize the page for work.
+            </div>
+          </div>
+
+        </div>
+
+        <div class="figure-card">
+          <img
+            src="assets/capstone_action_distribution.png"
+            alt="Distribution of final human-review action recommendations"
+          />
+
+          <p class="caption">
+            <strong>Takeaway:</strong>
+            most pages are monitored or held, reflecting a deliberately
+            conservative human-review policy.
+          </p>
+        </div>
+
+        <h3>Reason codes</h3>
+
+        <ul>
+          <li><code>HIGH_RISK_VISIBLE</code></li>
+          <li><code>LOW_CTR_VISIBLE</code></li>
+          <li><code>STALE_VISIBLE</code></li>
+          <li><code>MODERATE_RISK</code></li>
+          <li><code>LOW_EVIDENCE</code></li>
+        </ul>
+
+        <h3>Human-review rule</h3>
+
+        <p>
+          Before changing content, a reviewer should inspect freshness,
+          seasonality, search intent, content overlap, SERP context, and
+          business value.
+        </p>
+
+        <div class="callout honest">
+          <div class="callout-title">Do not automate</div>
+          <p>
+            The score should not automatically rewrite or publish content,
+            delete pages, change redirects or canonicals, modify metadata, or
+            make revenue and spending decisions.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Reproducibility -->
+    <section id="reproducibility">
+      <div class="section-card">
+        <div class="section-kicker">08 · Reproducibility</div>
+        <h2>Reproducibility</h2>
+
+        <p>
+          The complete analysis, notebooks, receipts, and source files are
+          available in the public repository.
+        </p>
+
+        <p>
+          <a
+            href="https://github.com/ZubairQazzi/flyrank-ml-internship-zubair"
+            target="_blank"
+            rel="noopener"
+          >
+            View the full project on GitHub →
+          </a>
+        </p>
+
+        <h3>Key settings</h3>
+
+        <ul>
+          <li>Random seed: <code>42</code></li>
+          <li>Feature window: March 1–21, 2026</li>
+          <li>Outcome window: March 22–31, 2026</li>
+          <li>Grouped test size: 20% of clients</li>
+          <li>Training clients: 31</li>
+          <li>Held-out clients: 8</li>
+          <li>Held-out rows: 4,247</li>
+          <li>Client overlap: 0</li>
+        </ul>
+
+        <h3>Fresh-clone starting point</h3>
+
+        <div class="repro-box">
+git clone https://github.com/ZubairQazzi/flyrank-ml-internship-zubair.git
+cd flyrank-ml-internship-zubair
+        </div>
+
+        <p>
+          Open <code>work/notebooks/capstone.ipynb</code> in Google Colab,
+          configure the required <code>HF_TOKEN</code> secret, and run
+          <strong>Runtime → Run all</strong>.
+        </p>
+
+        <h3>Generated artifacts</h3>
+
+        <ul>
+          <li><code>work/figures/capstone_model_vs_baseline.png</code></li>
+          <li><code>work/figures/capstone_action_distribution.png</code></li>
+          <li><code>work/outputs/capstone_metrics.json</code></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Acknowledgments -->
+    <section id="acknowledgments">
+      <div class="section-card">
+        <div class="section-kicker">09 · Credit</div>
+        <h2>Acknowledgments & data credit</h2>
+
+        <p>
+          This project was completed as part of the FlyRank ML Internship.
+        </p>
+
+        <p>
+          Built on the
+          <a
+            href="https://flyrank.ai"
+            target="_blank"
+            rel="noopener"
+          >
+            <strong>FlyRank ML Internship dataset</strong>
+          </a>.
+        </p>
+
+        <p>
+          The dataset provided the pseudonymized production search-performance
+          data used throughout this analysis. All interpretations, modeling
+          choices, validation decisions, and recommendations in this report are
+          my own.
+        </p>
+      </div>
+    </section>
+
+  </main>
 
   <footer>
-    Content Refresh Opportunity Scoring · Zubair Tariq · August 2026
+    <div class="container">
+      <div class="footer-title">
+        Content Refresh Opportunity Scoring
+      </div>
+      Zubair Tariq · FlyRank ML Internship · August 2026
+    </div>
   </footer>
 
 </body>
